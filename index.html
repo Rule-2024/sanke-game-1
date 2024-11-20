@@ -134,67 +134,82 @@
         let dy = 0;
         let score = 0;
         let gameSpeed = 150;
+        let isGameStarted = false;
         let isGameRunning = false;
         let gameInterval = null;
         
         let highScore = localStorage.getItem('snakeHighScore') || 0;
         document.getElementById('highScore').textContent = highScore;
 
-        let audioContext;
-        let bgGain;
         let isMusicOn = true;
+        let audioContext = null;
+        let bgGain = null;
 
         function initAudio() {
+            if (audioContext) {
+                return; // 如果已经初始化，直接返回
+            }
+            
             audioContext = new (window.AudioContext || window.webkitAudioContext)();
             bgGain = audioContext.createGain();
-            bgGain.gain.setValueAtTime(0.1, audioContext.currentTime);
+            bgGain.gain.setValueAtTime(isMusicOn ? 0.1 : 0, audioContext.currentTime);
             bgGain.connect(audioContext.destination);
 
-            // 欢快的音符序列
-            const notes = [
-                523.25, // C5
-                587.33, // D5
-                659.25, // E5
-                698.46, // F5
-                783.99, // G5
-                659.25, // E5
-                587.33, // D5
-                523.25  // C5
+            // 白月光与朱砂痣风格的音符序列
+            const melody = [
+                // 主旋律音符频率
+                { note: 523.25, duration: 0.2 }, // C5
+                { note: 587.33, duration: 0.2 }, // D5
+                { note: 659.25, duration: 0.4 }, // E5
+                { note: 698.46, duration: 0.2 }, // F5
+                { note: 783.99, duration: 0.4 }, // G5
+                { note: 659.25, duration: 0.2 }, // E5
+                { note: 587.33, duration: 0.2 }, // D5
+                { note: 523.25, duration: 0.4 }, // C5
+                { note: 587.33, duration: 0.2 }, // D5
+                { note: 659.25, duration: 0.4 }, // E5
+                { note: 523.25, duration: 0.4 }, // C5
             ];
-            
-            function playNote(time, note) {
+
+            function playNote(time, noteObj) {
                 const osc = audioContext.createOscillator();
                 const noteGain = audioContext.createGain();
                 
+                // 使用正弦波产生更柔和的音色
                 osc.type = 'sine';
-                osc.frequency.setValueAtTime(note, time);
+                osc.frequency.setValueAtTime(noteObj.note, time);
                 
-                noteGain.gain.setValueAtTime(0.05, time);
-                noteGain.gain.exponentialRampToValueAtTime(0.01, time + 0.2);
+                // 添加音量包络
+                noteGain.gain.setValueAtTime(0, time);
+                noteGain.gain.linearRampToValueAtTime(0.1, time + 0.05);
+                noteGain.gain.linearRampToValueAtTime(0.05, time + noteObj.duration - 0.05);
+                noteGain.gain.linearRampToValueAtTime(0, time + noteObj.duration);
                 
                 osc.connect(noteGain);
                 noteGain.connect(bgGain);
                 
                 osc.start(time);
-                osc.stop(time + 0.2);
+                osc.stop(time + noteObj.duration);
             }
 
             function scheduleNotes() {
-                const noteDuration = 0.25; // 加快节奏
-                let time = audioContext.currentTime;
+                let currentTime = audioContext.currentTime;
+                let timeOffset = 0;
                 
-                notes.forEach((note, index) => {
-                    playNote(time + index * noteDuration, note);
+                melody.forEach(noteObj => {
+                    playNote(currentTime + timeOffset, noteObj);
+                    timeOffset += noteObj.duration;
                 });
 
-                setTimeout(scheduleNotes, notes.length * noteDuration * 1000);
+                // 循环播放
+                setTimeout(scheduleNotes, timeOffset * 1000);
             }
 
             scheduleNotes();
         }
 
         function playEatSound() {
-            if (!isMusicOn) return;  // 如果音乐关闭，不播放音效
+            if (!isMusicOn || !audioContext) return;  // 如果音乐关闭或音频上下文未初始化，不播放音效
             
             const osc = audioContext.createOscillator();
             const gainNode = audioContext.createGain();
@@ -226,6 +241,8 @@
         }
 
         function moveSnake() {
+            if (!isGameRunning) return; // 确保在暂停状态下不移动
+            
             const head = {x: snake[0].x + dx, y: snake[0].y + dy};
             
             if (head.x < 0) head.x = gridCount - 1;
@@ -278,45 +295,64 @@
         function startGame() {
             if (!audioContext) {
                 initAudio();
-                if (!isMusicOn) {  // 初始化后检查音乐开关状态
-                    bgGain.gain.setValueAtTime(0, audioContext.currentTime);
-                }
             }
             
-            if (!isGameRunning) {
-                if (audioContext.state === 'suspended') {
-                    audioContext.resume();
-                }
+            if (audioContext.state === 'suspended') {
+                audioContext.resume();
+            }
+            
+            if (!isGameStarted) {
+                // 第一次开始游戏
+                isGameStarted = true;
                 isGameRunning = true;
                 gameInterval = setInterval(moveSnake, gameSpeed);
                 startBtn.textContent = '重新开始';
                 pauseBtn.disabled = false;
+                if (isMusicOn && bgGain) {
+                    bgGain.gain.setValueAtTime(0.1, audioContext.currentTime);
+                }
             } else {
+                // 重新开始游戏
                 resetGame();
             }
         }
 
         function pauseGame() {
+            if (!isGameStarted) return;
+            
             if (isGameRunning) {
+                // 暂停游戏
                 clearInterval(gameInterval);
-                if (isMusicOn) {  // 只有在音乐开启时才调整音量
+                gameInterval = null; // 清除interval引用
+                if (isMusicOn && bgGain) {
                     bgGain.gain.setValueAtTime(0, audioContext.currentTime);
                 }
                 pauseBtn.textContent = '继续';
                 isGameRunning = false;
             } else {
+                // 继续游戏
+                isGameRunning = true;
                 gameInterval = setInterval(moveSnake, gameSpeed);
-                if (isMusicOn) {  // 只有在音乐开启时才调整音量
+                if (isMusicOn && bgGain) {
                     bgGain.gain.setValueAtTime(0.1, audioContext.currentTime);
                 }
                 pauseBtn.textContent = '暂停';
-                isGameRunning = true;
             }
         }
 
         function resetGame() {
-            clearInterval(gameInterval);
-            bgGain.gain.setValueAtTime(0, audioContext.currentTime);
+            // 清除当前游戏状态
+            if (gameInterval) {
+                clearInterval(gameInterval);
+                gameInterval = null;
+            }
+            
+            // 重置音乐
+            if (bgGain) {
+                bgGain.gain.setValueAtTime(0, audioContext.currentTime);
+            }
+            
+            // 重置游戏数据
             snake = [{x: 10, y: 10}];
             dx = 1;
             dy = 0;
@@ -324,7 +360,16 @@
             scoreElement.textContent = score;
             generateFood();
             drawGame();
-            startGame();
+            
+            // 重新开始游戏
+            isGameStarted = true;
+            isGameRunning = true;
+            gameInterval = setInterval(moveSnake, gameSpeed);
+            
+            // 根据音乐开关状态设置音量
+            if (isMusicOn && bgGain) {
+                bgGain.gain.setValueAtTime(0.1, audioContext.currentTime);
+            }
         }
 
         let touchStartX = 0;
@@ -370,10 +415,35 @@
             }
         });
 
+        // 音乐控制函数
+        function toggleMusic() {
+            isMusicOn = !isMusicOn;
+            
+            if (!audioContext) {
+                initAudio();
+            }
+            
+            // 直接控制音量，不管游戏状态
+            if (bgGain) {
+                bgGain.gain.setValueAtTime(isMusicOn ? 0.1 : 0, audioContext.currentTime);
+            }
+            
+            // 更新按钮状态
+            updateMusicButton();
+        }
+
+        // 更新音乐按钮状态
+        function updateMusicButton() {
+            musicBtn.innerHTML = isMusicOn ? '🔊 音乐开' : '🔈 音乐关';
+            musicBtn.style.background = isMusicOn ? '#4CAF50' : '#999';
+        }
+
+        // 事件监听
+        musicBtn.addEventListener('click', toggleMusic);
         startBtn.addEventListener('click', startGame);
         pauseBtn.addEventListener('click', pauseGame);
-        pauseBtn.disabled = true;
-        musicBtn.addEventListener('click', toggleMusic);
+        pauseBtn.disabled = true; // 初始禁用暂停按钮
+        updateMusicButton(); // 初始化音乐按钮状态
 
         drawGame();
     </script>
