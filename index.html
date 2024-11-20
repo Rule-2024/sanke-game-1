@@ -1,13 +1,21 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>贪吃蛇游戏</title>
     <style>
         :root {
             --theme-color: #4CAF50;
             --theme-dark: #388E3C;
             --theme-light: #C8E6C9;
+            --border-radius: 12px;
+            --container-width: min(90%, 500px);
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
         }
         
         body {
@@ -15,24 +23,58 @@
             flex-direction: column;
             align-items: center;
             background: var(--theme-light);
-            font-family: Arial, sans-serif;
-            margin: 0;
-            padding: 15px;
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             min-height: 100vh;
+            padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
         }
         
-        canvas {
-            border: 3px solid var(--theme-color);
-            border-radius: 8px;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-            touch-action: none;
-            max-width: 100%;
-            background: white;
-        }
-        
-        .controls {
-            margin: 15px 0;
+        .game-container {
+            width: var(--container-width);
             display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+            padding: 16px;
+        }
+
+        .title {
+            color: var(--theme-dark);
+            font-size: clamp(24px, 5vw, 32px);
+            font-weight: bold;
+            text-align: center;
+            margin: 16px 0;
+        }
+        
+        .score-board {
+            background: white;
+            width: 100%;
+            padding: 16px;
+            border-radius: var(--border-radius);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            display: flex;
+            justify-content: space-around;
+        }
+        
+        .score-item {
+            text-align: center;
+        }
+        
+        .score-label {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 4px;
+        }
+        
+        .score-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: var(--theme-dark);
+        }
+
+        .controls {
+            width: 100%;
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
             gap: 10px;
         }
         
@@ -40,83 +82,120 @@
             background: var(--theme-color);
             color: white;
             border: none;
-            padding: 12px 24px;
-            border-radius: 5px;
+            padding: 12px;
+            border-radius: var(--border-radius);
+            font-size: clamp(14px, 4vw, 16px);
+            font-weight: 500;
+            min-height: 44px;
             cursor: pointer;
-            font-size: 18px;
-            transition: background 0.3s;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            -webkit-tap-highlight-color: transparent;
         }
         
-        button:hover {
-            background: var(--theme-dark);
+        button:active {
+            transform: scale(0.98);
         }
         
         button:disabled {
-            background: #cccccc;
+            background: #ccc;
             cursor: not-allowed;
         }
-        
-        .score-board {
+
+        .game-board {
+            width: 100%;
+            aspect-ratio: 1;
             background: white;
-            padding: 15px 30px;
-            border-radius: 5px;
-            margin: 10px 0;
-            text-align: center;
-            font-size: 18px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            width: 80%;
-            max-width: 400px;
+            border-radius: var(--border-radius);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
         }
 
         .instructions {
+            width: 100%;
             background: white;
-            padding: 15px;
-            border-radius: 5px;
-            margin: 10px 0;
+            padding: 16px;
+            border-radius: var(--border-radius);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        .instructions p {
+            font-size: clamp(12px, 3.5vw, 14px);
+            color: #666;
             text-align: center;
-            font-size: 16px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            width: 80%;
-            max-width: 400px;
+            margin: 6px 0;
         }
 
-        h1 {
-            color: var(--theme-dark);
-            font-size: 32px;
-            margin: 10px 0;
+        @media (max-height: 700px) {
+            .game-container {
+                gap: 8px;
+                padding: 8px;
+            }
+            
+            .title {
+                margin: 8px 0;
+            }
+            
+            .score-board {
+                padding: 12px;
+            }
+            
+            .instructions {
+                padding: 12px;
+            }
         }
 
-        p {
-            margin: 8px 0;
-        }
-
-        button#musicBtn {
-            min-width: 100px;
-        }
-
-        /* 可选：当音乐关闭时改变按钮样式 */
-        button#musicBtn[data-state="off"] {
-            background: #999;
+        @media (min-width: 768px) {
+            .game-container {
+                padding: 24px;
+                gap: 16px;
+            }
+            
+            button {
+                padding: 16px;
+            }
         }
     </style>
 </head>
 <body>
-    <h1>贪吃蛇</h1>
-    <div class="score-board">
-        <p>当前分数: <span id="score">0</span></p>
-        <p>最高分数: <span id="highScore">0</span></p>
+    <div class="game-container">
+        <h1 class="title">贪吃蛇</h1>
+        
+        <div class="score-board">
+            <div class="score-item">
+                <div class="score-label">当前分数</div>
+                <div class="score-value" id="score">0</div>
+            </div>
+            <div class="score-item">
+                <div class="score-label">最高分数</div>
+                <div class="score-value" id="highScore">0</div>
+            </div>
+        </div>
+
+        <div class="controls">
+            <button id="startBtn">开始游戏</button>
+            <button id="pauseBtn">暂停</button>
+            <button id="musicBtn">🔊 音乐开</button>
+        </div>
+
+        <div class="game-board">
+            <canvas id="gameCanvas" width="400" height="400"></canvas>
+        </div>
+
+        <div class="instructions">
+            <p>电脑：使用方向键 ↑ ↓ ← → 控制</p>
+            <p>手机：滑动屏幕控制方向</p>
+        </div>
     </div>
-    <div class="controls">
-        <button id="startBtn">开始游戏</button>
-        <button id="pauseBtn">暂停</button>
-        <button id="musicBtn">🔊 音乐开</button>
-    </div>
-    <canvas id="gameCanvas" width="400" height="400"></canvas>
-    <div class="instructions">
-        <p>电脑：使用方向键 ↑ ↓ ← → 控制</p>
-        <p>手机：滑动屏幕控制方向</p>
-        <p>特性：可以穿墙，注意别撞到自己哦！</p>
-    </div>
+
     <script>
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
