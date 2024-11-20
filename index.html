@@ -6,10 +6,8 @@
     <style>
         :root {
             --theme-color: #4CAF50;
-            --theme-dark: #388E3C;
             --theme-light: #C8E6C9;
-            --border-radius: 12px;
-            --container-width: min(90%, 500px);
+            --border-radius: 8px;
         }
         
         * {
@@ -19,98 +17,70 @@
         }
         
         body {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
             background: var(--theme-light);
             font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             min-height: 100vh;
-            padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
-        }
-        
-        .game-container {
-            width: var(--container-width);
+            padding: 20px;
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 12px;
-            padding: 16px;
         }
 
-        .title {
-            color: var(--theme-dark);
-            font-size: clamp(24px, 5vw, 32px);
-            font-weight: bold;
+        .header {
+            width: 100%;
             text-align: center;
-            margin: 16px 0;
+            margin-bottom: 20px;
+            font-size: 28px;
+            color: var(--theme-color);
         }
         
-        .score-board {
+        .score-card {
             background: white;
-            width: 100%;
-            padding: 16px;
             border-radius: var(--border-radius);
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-            display: flex;
-            justify-content: space-around;
+            padding: 20px;
+            width: 100%;
+            max-width: 400px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.1);
         }
         
         .score-item {
             text-align: center;
-        }
-        
-        .score-label {
-            font-size: 14px;
-            color: #666;
-            margin-bottom: 4px;
-        }
-        
-        .score-value {
-            font-size: 24px;
-            font-weight: bold;
-            color: var(--theme-dark);
+            margin: 10px 0;
+            font-size: 18px;
         }
 
         .controls {
-            width: 100%;
             display: grid;
             grid-template-columns: repeat(3, 1fr);
             gap: 10px;
+            width: 100%;
+            max-width: 400px;
+            margin-bottom: 20px;
         }
         
         button {
             background: var(--theme-color);
             color: white;
             border: none;
-            padding: 12px;
+            padding: 15px 0;
             border-radius: var(--border-radius);
-            font-size: clamp(14px, 4vw, 16px);
-            font-weight: 500;
-            min-height: 44px;
+            font-size: 16px;
             cursor: pointer;
-            transition: all 0.2s;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            -webkit-tap-highlight-color: transparent;
-        }
-        
-        button:active {
-            transform: scale(0.98);
         }
         
         button:disabled {
-            background: #ccc;
-            cursor: not-allowed;
+            opacity: 0.7;
         }
 
         .game-board {
             width: 100%;
+            max-width: 400px;
             aspect-ratio: 1;
             background: white;
+            border: 2px solid var(--theme-color);
             border-radius: var(--border-radius);
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-            overflow: hidden;
+            margin-bottom: 20px;
         }
         
         canvas {
@@ -121,79 +91,63 @@
 
         .instructions {
             width: 100%;
+            max-width: 400px;
             background: white;
-            padding: 16px;
+            padding: 15px;
             border-radius: var(--border-radius);
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-        }
-        
-        .instructions p {
-            font-size: clamp(12px, 3.5vw, 14px);
-            color: #666;
             text-align: center;
-            margin: 6px 0;
+            font-size: 14px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.1);
         }
 
-        @media (max-height: 700px) {
-            .game-container {
-                gap: 8px;
-                padding: 8px;
+        @media (max-width: 480px) {
+            body {
+                padding: 15px;
             }
             
-            .title {
-                margin: 8px 0;
+            .header {
+                font-size: 24px;
+                margin-bottom: 15px;
             }
             
-            .score-board {
-                padding: 12px;
+            .score-card {
+                padding: 15px;
+                margin-bottom: 15px;
+            }
+            
+            button {
+                padding: 12px 0;
+                font-size: 15px;
             }
             
             .instructions {
                 padding: 12px;
-            }
-        }
-
-        @media (min-width: 768px) {
-            .game-container {
-                padding: 24px;
-                gap: 16px;
-            }
-            
-            button {
-                padding: 16px;
+                font-size: 13px;
             }
         }
     </style>
 </head>
 <body>
-    <div class="game-container">
-        <h1 class="title">贪吃蛇</h1>
-        
-        <div class="score-board">
-            <div class="score-item">
-                <div class="score-label">当前分数</div>
-                <div class="score-value" id="score">0</div>
-            </div>
-            <div class="score-item">
-                <div class="score-label">最高分数</div>
-                <div class="score-value" id="highScore">0</div>
-            </div>
-        </div>
+    <div class="header">贪吃蛇</div>
+    
+    <div class="score-card">
+        <div class="score-item">当前分数: <span id="score">0</span></div>
+        <div class="score-item">最高分数: <span id="highScore">0</span></div>
+    </div>
 
-        <div class="controls">
-            <button id="startBtn">开始游戏</button>
-            <button id="pauseBtn">暂停</button>
-            <button id="musicBtn">🔊 音乐开</button>
-        </div>
+    <div class="controls">
+        <button id="startBtn">重新开始</button>
+        <button id="pauseBtn">暂停</button>
+        <button id="musicBtn">🔊 音乐开</button>
+    </div>
 
-        <div class="game-board">
-            <canvas id="gameCanvas" width="400" height="400"></canvas>
-        </div>
+    <div class="game-board">
+        <canvas id="gameCanvas" width="400" height="400"></canvas>
+    </div>
 
-        <div class="instructions">
-            <p>电脑：使用方向键 ↑ ↓ ← → 控制</p>
-            <p>手机：滑动屏幕控制方向</p>
-        </div>
+    <div class="instructions">
+        <p>电脑：使用方向键 ↑ ↓ ← → 控制</p>
+        <p>手机：滑动屏幕控制方向</p>
     </div>
 
     <script>
