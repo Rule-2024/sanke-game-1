@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>贪吃蛇游戏</title>
+    <style>
+        :root {
+            --theme-color: #4CAF50;
+            --theme-dark: #388E3C;
+            --theme-light: #C8E6C9;
+        }
+        
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background: var(--theme-light);
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 15px;
+            min-height: 100vh;
+        }
+        
+        canvas {
+            border: 3px solid var(--theme-color);
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            touch-action: none;
+            max-width: 100%;
+            background: white;
+        }
+        
+        .controls {
+            margin: 15px 0;
+            display: flex;
+            gap: 10px;
+        }
+        
+        button {
+            background: var(--theme-color);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 18px;
+            transition: background 0.3s;
+        }
+        
+        button:hover {
+            background: var(--theme-dark);
+        }
+        
+        button:disabled {
+            background: #cccccc;
+            cursor: not-allowed;
+        }
+        
+        .score-board {
+            background: white;
+            padding: 15px 30px;
+            border-radius: 5px;
+            margin: 10px 0;
+            text-align: center;
+            font-size: 18px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            width: 80%;
+            max-width: 400px;
+        }
+
+        .instructions {
+            background: white;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+            text-align: center;
+            font-size: 16px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            width: 80%;
+            max-width: 400px;
+        }
+
+        h1 {
+            color: var(--theme-dark);
+            font-size: 32px;
+            margin: 10px 0;
+        }
+
+        p {
+            margin: 8px 0;
+        }
+
+        button#musicBtn {
+            min-width: 100px;
+        }
+
+        /* 可选：当音乐关闭时改变按钮样式 */
+        button#musicBtn[data-state="off"] {
+            background: #999;
+        }
+    </style>
+</head>
+<body>
+    <h1>贪吃蛇</h1>
+    <div class="score-board">
+        <p>当前分数: <span id="score">0</span></p>
+        <p>最高分数: <span id="highScore">0</span></p>
+    </div>
+    <div class="controls">
+        <button id="startBtn">开始游戏</button>
+        <button id="pauseBtn">暂停</button>
+        <button id="musicBtn">🔊 音乐开</button>
+    </div>
+    <canvas id="gameCanvas" width="400" height="400"></canvas>
+    <div class="instructions">
+        <p>电脑：使用方向键 ↑ ↓ ← → 控制</p>
+        <p>手机：滑动屏幕控制方向</p>
+        <p>特性：可以穿墙，注意别撞到自己哦！</p>
+    </div>
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreElement = document.getElementById('score');
+        const startBtn = document.getElementById('startBtn');
+        const pauseBtn = document.getElementById('pauseBtn');
+        const musicBtn = document.getElementById('musicBtn');
+        
+        const gridSize = 20;
+        const gridCount = 20;
+
+        let snake = [{x: 10, y: 10}];
+        let food = {x: 15, y: 15};
+        let dx = 1;
+        let dy = 0;
+        let score = 0;
+        let gameSpeed = 150;
+        let isGameRunning = false;
+        let gameInterval = null;
+        
+        let highScore = localStorage.getItem('snakeHighScore') || 0;
+        document.getElementById('highScore').textContent = highScore;
+
+        let audioContext;
+        let bgGain;
+        let isMusicOn = true;
+
+        function initAudio() {
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            bgGain = audioContext.createGain();
+            bgGain.gain.setValueAtTime(0.1, audioContext.currentTime);
+            bgGain.connect(audioContext.destination);
+
+            // 欢快的音符序列
+            const notes = [
+                523.25, // C5
+                587.33, // D5
+                659.25, // E5
+                698.46, // F5
+                783.99, // G5
+                659.25, // E5
+                587.33, // D5
+                523.25  // C5
+            ];
+            
+            function playNote(time, note) {
+                const osc = audioContext.createOscillator();
+                const noteGain = audioContext.createGain();
+                
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(note, time);
+                
+                noteGain.gain.setValueAtTime(0.05, time);
+                noteGain.gain.exponentialRampToValueAtTime(0.01, time + 0.2);
+                
+                osc.connect(noteGain);
+                noteGain.connect(bgGain);
+                
+                osc.start(time);
+                osc.stop(time + 0.2);
+            }
+
+            function scheduleNotes() {
+                const noteDuration = 0.25; // 加快节奏
+                let time = audioContext.currentTime;
+                
+                notes.forEach((note, index) => {
+                    playNote(time + index * noteDuration, note);
+                });
+
+                setTimeout(scheduleNotes, notes.length * noteDuration * 1000);
+            }
+
+            scheduleNotes();
+        }
+
+        function playEatSound() {
+            if (!isMusicOn) return;  // 如果音乐关闭，不播放音效
+            
+            const osc = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+            
+            osc.type = 'square';
+            osc.frequency.setValueAtTime(880, audioContext.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(1760, audioContext.currentTime + 0.1);
+            
+            gainNode.gain.setValueAtTime(0.05, audioContext.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.2);
+            
+            osc.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+            
+            osc.start();
+            osc.stop(audioContext.currentTime + 0.2);
+        }
+
+        function drawGame() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            ctx.fillStyle = '#4CAF50';
+            snake.forEach(segment => {
+                ctx.fillRect(segment.x * gridSize, segment.y * gridSize, gridSize - 1, gridSize - 1);
+            });
+            
+            ctx.fillStyle = '#e74c3c';
+            ctx.fillRect(food.x * gridSize, food.y * gridSize, gridSize - 1, gridSize - 1);
+        }
+
+        function moveSnake() {
+            const head = {x: snake[0].x + dx, y: snake[0].y + dy};
+            
+            if (head.x < 0) head.x = gridCount - 1;
+            if (head.x >= gridCount) head.x = 0;
+            if (head.y < 0) head.y = gridCount - 1;
+            if (head.y >= gridCount) head.y = 0;
+            
+            if (head.x === food.x && head.y === food.y) {
+                generateFood();
+                score += 10;
+                scoreElement.textContent = score;
+                playEatSound();
+                
+                if (score > highScore) {
+                    highScore = score;
+                    localStorage.setItem('snakeHighScore', highScore);
+                    document.getElementById('highScore').textContent = highScore;
+                }
+            } else {
+                snake.pop();
+            }
+            
+            if (snake.some(segment => segment.x === head.x && segment.y === head.y)) {
+                gameOver();
+                return;
+            }
+            
+            snake.unshift(head);
+            drawGame();
+        }
+
+        function generateFood() {
+            food = {
+                x: Math.floor(Math.random() * gridCount),
+                y: Math.floor(Math.random() * gridCount)
+            };
+            while (snake.some(segment => segment.x === food.x && segment.y === food.y)) {
+                food = {
+                    x: Math.floor(Math.random() * gridCount),
+                    y: Math.floor(Math.random() * gridCount)
+                };
+            }
+        }
+
+        function gameOver() {
+            alert(`游戏结束！\n最终得分：${score}\n最高分：${highScore}`);
+            resetGame();
+        }
+
+        function startGame() {
+            if (!audioContext) {
+                initAudio();
+                if (!isMusicOn) {  // 初始化后检查音乐开关状态
+                    bgGain.gain.setValueAtTime(0, audioContext.currentTime);
+                }
+            }
+            
+            if (!isGameRunning) {
+                if (audioContext.state === 'suspended') {
+                    audioContext.resume();
+                }
+                isGameRunning = true;
+                gameInterval = setInterval(moveSnake, gameSpeed);
+                startBtn.textContent = '重新开始';
+                pauseBtn.disabled = false;
+            } else {
+                resetGame();
+            }
+        }
+
+        function pauseGame() {
+            if (isGameRunning) {
+                clearInterval(gameInterval);
+                if (isMusicOn) {  // 只有在音乐开启时才调整音量
+                    bgGain.gain.setValueAtTime(0, audioContext.currentTime);
+                }
+                pauseBtn.textContent = '继续';
+                isGameRunning = false;
+            } else {
+                gameInterval = setInterval(moveSnake, gameSpeed);
+                if (isMusicOn) {  // 只有在音乐开启时才调整音量
+                    bgGain.gain.setValueAtTime(0.1, audioContext.currentTime);
+                }
+                pauseBtn.textContent = '暂停';
+                isGameRunning = true;
+            }
+        }
+
+        function resetGame() {
+            clearInterval(gameInterval);
+            bgGain.gain.setValueAtTime(0, audioContext.currentTime);
+            snake = [{x: 10, y: 10}];
+            dx = 1;
+            dy = 0;
+            score = 0;
+            scoreElement.textContent = score;
+            generateFood();
+            drawGame();
+            startGame();
+        }
+
+        let touchStartX = 0;
+        let touchStartY = 0;
+
+        canvas.addEventListener('touchstart', function(e) {
+            touchStartX = e.touches[0].clientX;
+            touchStartY = e.touches[0].clientY;
+            e.preventDefault();
+        });
+
+        canvas.addEventListener('touchmove', function(e) {
+            e.preventDefault();
+        });
+
+        canvas.addEventListener('touchend', function(e) {
+            if (!isGameRunning) return;
+            
+            const touchEndX = e.changedTouches[0].clientX;
+            const touchEndY = e.changedTouches[0].clientY;
+            
+            const deltaX = touchEndX - touchStartX;
+            const deltaY = touchEndY - touchStartY;
+            
+            if (Math.abs(deltaX) > Math.abs(deltaY)) {
+                if (deltaX > 0 && dy !== 0) { dx = 1; dy = 0; }
+                if (deltaX < 0 && dy !== 0) { dx = -1; dy = 0; }
+            } else {
+                if (deltaY > 0 && dx !== 0) { dx = 0; dy = 1; }
+                if (deltaY < 0 && dx !== 0) { dx = 0; dy = -1; }
+            }
+            e.preventDefault();
+        });
+
+        document.addEventListener('keydown', function(e) {
+            if (!isGameRunning) return;
+            
+            switch(e.key) {
+                case 'ArrowUp': if (dy !== 1) { dx = 0; dy = -1; } break;
+                case 'ArrowDown': if (dy !== -1) { dx = 0; dy = 1; } break;
+                case 'ArrowLeft': if (dx !== 1) { dx = -1; dy = 0; } break;
+                case 'ArrowRight': if (dx !== -1) { dx = 1; dy = 0; } break;
+            }
+        });
+
+        startBtn.addEventListener('click', startGame);
+        pauseBtn.addEventListener('click', pauseGame);
+        pauseBtn.disabled = true;
+        musicBtn.addEventListener('click', toggleMusic);
+
+        drawGame();
+    </script>
+</body>
+</html>
