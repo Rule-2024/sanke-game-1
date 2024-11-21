@@ -385,6 +385,9 @@
                 bgGain.gain.setValueAtTime(0, audioContext.currentTime);
             }
             
+            // 重置暂停按钮状态
+            pauseBtn.textContent = '暂停';
+            
             // 重置游戏数据
             snake = [{x: 10, y: 10}];
             dx = 1;
